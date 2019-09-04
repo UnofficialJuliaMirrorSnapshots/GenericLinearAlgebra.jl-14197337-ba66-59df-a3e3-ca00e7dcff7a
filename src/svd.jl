@@ -280,13 +280,23 @@ function Base.getproperty(F::BidiagonalFactorization, s::Symbol)
         if s === :leftQ
             return LinearAlgebra.QRPackedQ(R, τl)
         elseif s === :rightQ
-            return LinearAlgebra.HessenbergQ(copy(transpose(R[1:size(R,2),:])), τr)
+            if VERSION < v"1.3.0-DEV.243"
+                return LinearAlgebra.HessenbergQ(copy(transpose(R[1:size(R,2),:])), τr)
+            else
+                factors = copy(transpose(R[1:size(R,2),:]))
+                return LinearAlgebra.HessenbergQ{eltype(factors),typeof(factors),typeof(τr),false}('U', factors, τr)
+            end
         else
             return getfield(F, s)
         end
     else
         if s === :leftQ
-            return LinearAlgebra.HessenbergQ(R[:,1:size(R,1)], τl)
+            if VERSION < v"1.3.0-DEV.243"
+                return LinearAlgebra.HessenbergQ(R[:,1:size(R,1)], τl)
+            else
+                factors = R[:,1:size(R,1)]
+                return LinearAlgebra.HessenbergQ{eltype(factors),typeof(factors),typeof(τr),false}('U', factors, τl)
+            end
         elseif s === :rightQ
             # return transpose(LinearAlgebra.LQPackedQ(R, τr)) # FixMe! check that this shouldn't be adjoint
             LinearAlgebra.QRPackedQ(copy(transpose(R)), τr)
@@ -457,7 +467,13 @@ function LinearAlgebra.svdvals!(A::StridedMatrix; tol = eps(real(eltype(A))), de
 end
 
 # FixMe! The full keyword is redundant for Bidiagonal and should be removed from Base
-LinearAlgebra.svd!(B::Bidiagonal{T}; tol = eps(T), full = false, debug = false) where T<:Real = _svd!(B, tol = tol, debug = debug)
+LinearAlgebra.svd!(B::Bidiagonal{T};
+    tol = eps(T),
+    full = false,
+    # To avoid breaking on <Julia 1.3, the `alg` keyword doesn't do anything. Once we drop support for Julia 1.2
+    # and below, we can make the keyword argument work correctly
+    alg = nothing,
+    debug = false) where T<:Real = _svd!(B, tol = tol, debug = debug)
 
 """
     svd!(A[, tol, full, debug])::SVD
@@ -478,7 +494,13 @@ A generic singular value decomposition (SVD). The implementation only uses Julia
 ```jldoctest
 ```
 """
-function LinearAlgebra.svd!(A::StridedMatrix{T}; tol = eps(real(eltype(A))), full = false, debug = false) where T
+function LinearAlgebra.svd!(A::StridedMatrix{T};
+    tol = eps(real(eltype(A))),
+    full = false,
+    # To avoid breaking on <Julia 1.3, the `alg` keyword doesn't do anything. Once we drop support for Julia 1.2
+    # and below, we can make the keyword argument work correctly
+    alg = nothing,
+    debug = false) where T
 
     m, n = size(A)
 
